@@ -1,0 +1,34 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: ankiety-hostpath
+provisioner: k8s.io/minikube-hostpath
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-data
+  namespace: ankiety-live
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ankiety-hostpath
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data
+  namespace: ankiety-live
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ankiety-hostpath
+  resources:
+    requests:
+      storage: 512Mi

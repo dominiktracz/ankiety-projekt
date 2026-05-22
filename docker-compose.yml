@@ -1,0 +1,152 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: ankiety-postgres
+    environment:
+      POSTGRES_DB: ankiety
+      POSTGRES_USER: ankiety_user
+      POSTGRES_PASSWORD: ankiety_secret_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ankiety_user -d ankiety"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: ankiety-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  survey-api:
+    build:
+      context: ./services/survey-api
+      dockerfile: Dockerfile
+    container_name: ankiety-survey-api
+    environment:
+      SURVEY_API_PORT: 3000
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ankiety
+      POSTGRES_USER: ankiety_user
+      POSTGRES_PASSWORD: ankiety_secret_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-ankiety-dev-jwt-secret-change-me}
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  voting-service:
+    build:
+      context: ./services/voting-service
+      dockerfile: Dockerfile
+    container_name: ankiety-voting-service
+    environment:
+      VOTING_SERVICE_PORT: 3001
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-ankiety-dev-jwt-secret-change-me}
+    ports:
+      - "3001:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  vote-worker:
+    build:
+      context: ./services/vote-worker
+      dockerfile: Dockerfile
+    container_name: ankiety-vote-worker
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: ankiety
+      POSTGRES_USER: ankiety_user
+      POSTGRES_PASSWORD: ankiety_secret_password
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      WORKER_BATCH_SIZE: 100
+      WORKER_INTERVAL_MS: 5000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  websocket-server:
+    build:
+      context: ./services/websocket-server
+      dockerfile: Dockerfile
+    container_name: ankiety-websocket-server
+    environment:
+      WEBSOCKET_PORT: 3002
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      JWT_SECRET: ${JWT_SECRET:-ankiety-dev-jwt-secret-change-me}
+    ports:
+      - "3002:3002"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: ankiety-frontend
+    ports:
+      - "8080:8080"
+    depends_on:
+      - survey-api
+      - voting-service
+      - websocket-server
+    networks:
+      - app-network
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+
+networks:
+  app-network:
+    driver: bridge

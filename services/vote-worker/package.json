@@ -1,0 +1,14 @@
+{
+  "name": "vote-worker",
+  "version": "1.0.0",
+  "description": "Worker przenoszący głosy z Redisa do PostgreSQL w paczkach",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "pg": "^8.13.0",
+    "ioredis": "^5.4.1"
+  }
+}

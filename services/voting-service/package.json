@@ -1,0 +1,19 @@
+{
+  "name": "voting-service",
+  "version": "1.0.0",
+  "description": "Mikroserwis do przyjmowania głosów (buforowanie w Redis)",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js"
+  },
+  "dependencies": {
+    "express": "^4.21.0",
+    "ioredis": "^5.4.1",
+    "cors": "^2.8.5",
+    "helmet": "^8.0.0",
+    "morgan": "^1.10.0",
+    "uuid": "^10.0.0",
+    "jsonwebtoken": "^9.0.2"
+  }
+}

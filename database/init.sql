@@ -1,0 +1,68 @@
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS surveys (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    owner_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS options (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    survey_id UUID NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    text VARCHAR(500) NOT NULL,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS votes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    survey_id UUID NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    option_id UUID NOT NULL REFERENCES options(id) ON DELETE CASCADE,
+    voter_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT unique_vote_per_survey UNIQUE (survey_id, voter_id)
+);
+
+CREATE TABLE IF NOT EXISTS vote_aggregates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    survey_id UUID NOT NULL REFERENCES surveys(id) ON DELETE CASCADE,
+    option_id UUID NOT NULL REFERENCES options(id) ON DELETE CASCADE,
+    vote_count INTEGER DEFAULT 0,
+    last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    CONSTRAINT unique_aggregate UNIQUE (survey_id, option_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_users_username ON users(username);
+CREATE INDEX IF NOT EXISTS idx_surveys_owner_id ON surveys(owner_id);
+CREATE INDEX IF NOT EXISTS idx_options_survey_id ON options(survey_id);
+CREATE INDEX IF NOT EXISTS idx_votes_survey_id ON votes(survey_id);
+CREATE INDEX IF NOT EXISTS idx_votes_option_id ON votes(option_id);
+CREATE INDEX IF NOT EXISTS idx_votes_voter_id ON votes(voter_id);
+CREATE INDEX IF NOT EXISTS idx_vote_aggregates_survey_id ON vote_aggregates(survey_id);
+
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trigger_surveys_updated_at
+    BEFORE UPDATE ON surveys
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
