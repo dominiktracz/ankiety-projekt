@@ -85,19 +85,19 @@ jobs:
           text = path.read_text()
           tag = "${{ github.sha }}"
           images = [
-              "ankiety-projekt-survey-api",
-              "ankiety-projekt-voting-service",
-              "ankiety-projekt-vote-worker",
-              "ankiety-projekt-websocket-server",
-              "ankiety-projekt-frontend",
+              "ghcr.io/dominiktracz/ankiety-projekt-survey-api",
+              "ghcr.io/dominiktracz/ankiety-projekt-voting-service",
+              "ghcr.io/dominiktracz/ankiety-projekt-vote-worker",
+              "ghcr.io/dominiktracz/ankiety-projekt-websocket-server",
+              "ghcr.io/dominiktracz/ankiety-projekt-frontend",
           ]
 
           lines = text.splitlines()
           current_image = None
           for i, line in enumerate(lines):
               stripped = line.strip()
-              if stripped.startswith("newName: ghcr.io/dominiktracz/"):
-                  current_image = stripped.rsplit("/", 1)[-1]
+              if stripped.startswith("name: ") or stripped.startswith("newName: "):
+                  current_image = stripped.split(":", 1)[1].strip()
               elif stripped.startswith("newTag:") and current_image in images:
                   indent = line[: len(line) - len(line.lstrip())]
                   lines[i] = f"{indent}newTag: {tag}"
