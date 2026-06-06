@@ -44,13 +44,31 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push ${{ matrix.service }}
-        uses: docker/build-push-action@v6
-        with:
-          context: ./services/${{ matrix.service }}
-          push: true
-          tags: |
-            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ github.sha }}
-            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
+        env:
+          SERVICE: ${{ matrix.service }}
+          IMAGE_SHA: ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ github.sha }}
+          IMAGE_LATEST: ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:latest
+        run: |
+          for attempt in 1 2 3; do
+            echo "Build attempt ${attempt}/3 for ${SERVICE}"
+            if docker build \
+              --pull \
+              -t "$IMAGE_SHA" \
+              -t "$IMAGE_LATEST" \
+              "./services/${SERVICE}"; then
+              break
+            fi
+
+            if [ "$attempt" = "3" ]; then
+              echo "Docker build failed after 3 attempts."
+              exit 1
+            fi
+
+            sleep $((attempt * 30))
+          done
+
+          docker push "$IMAGE_SHA"
+          docker push "$IMAGE_LATEST"
 
   update-gitops-config:
     name: Update GitOps config
